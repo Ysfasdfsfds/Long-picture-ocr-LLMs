@@ -1,2 +1,2 @@
 运行controller.pybu
-初步完成重构，主函数是controller.py 子函数都在refactor中
+二次重构，主函数是controller.py 子函数都在refactor中
