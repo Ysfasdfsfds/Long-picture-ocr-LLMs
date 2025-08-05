@@ -418,10 +418,73 @@ class LongImageOCR:
                 print(f"切片 {slice_index} (无OCR结果) 添加到结果列表")
             index += 1
                 
+        # # 保存原始OCR结果和头像位置到JSON文件
+        # import json
+        # import os
+        
+        # # 确保目录存在
+        # os.makedirs("guocheng", exist_ok=True)
+        
+        # # 将OCR结果转换为可序列化的格式
+        # serializable_ocr_results = []
+        # for item in all_ocr_results_original:
+        #     serializable_item = {
+        #         'slice_index': item['slice_index'],
+        #         'box': [point.tolist() if hasattr(point, 'tolist') else point for point in item['box']],
+        #         'text': item['text'],
+        #         'score': float(item['score']) if hasattr(item['score'], 'tolist') else item['score']
+        #     }
+        #     serializable_ocr_results.append(serializable_item)
+        
+        # # 将头像位置转换为可序列化的格式
+        # serializable_avatar_positions = []
+        # for item in all_avatar_positions_original:
+        #     serializable_item = {
+        #         'slice_index': item['slice_index'],
+        #         'box': item['box'],
+        #         'center_x': float(item['center_x']),
+        #         'center_y': float(item['center_y'])
+        #     }
+        #     serializable_avatar_positions.append(serializable_item)
+        
+        # # 转换numpy类型为Python原生类型以便JSON序列化
+        # import numpy as np
+        
+        # def convert_numpy(obj):
+        #     if isinstance(obj, np.ndarray):
+        #         return obj.tolist()
+        #     elif isinstance(obj, np.floating):
+        #         return float(obj)
+        #     elif isinstance(obj, np.integer):
+        #         return int(obj)
+        #     return obj
+        
+        # # 递归转换所有numpy类型
+        # def deep_convert(data):
+        #     if isinstance(data, dict):
+        #         return {k: deep_convert(v) for k, v in data.items()}
+        #     elif isinstance(data, list):
+        #         return [deep_convert(v) for v in data]
+        #     else:
+        #         return convert_numpy(data)
+        
+        # serializable_ocr_results = deep_convert(serializable_ocr_results)
+        # serializable_avatar_positions = deep_convert(serializable_avatar_positions)
+        
+        # # 保存OCR结果到JSON文件
+        # with open("guocheng/all_ocr_results_original.json", 'w', encoding='utf-8') as f:
+        #     json.dump(serializable_ocr_results, f, ensure_ascii=False, indent=2)
+        # print(f"已保存原始OCR结果到 guocheng/all_ocr_results_original.json")
+        
+        # # 保存头像位置到JSON文件
+        # with open("guocheng/all_avatar_positions_original.json", 'w', encoding='utf-8') as f:
+        #     json.dump(serializable_avatar_positions, f, ensure_ascii=False, indent=2)
+        # print(f"已保存原始头像位置到 guocheng/all_avatar_positions_original.json")
         
         # 去重处理
         print(f"\n=== 开始去重处理 ===")
         deduplicated_ocr, deduplicated_avatars = self._deduplicate_results(all_ocr_results_original, all_avatar_positions_original)
+                
         # 判断当前图片是否为飞书截图
         is_feishu_screenshot = self._is_feishu_screenshot(deduplicated_ocr)
         print(f"\n=== 基于去重后数据重新标记 ===")
@@ -3365,8 +3428,8 @@ def main():
     processor = LongImageOCR(config_path="./default_rapidocr.yaml")
     
     # 处理长图
-    # image_path = r"images/image copy 9.png"
-    image_path = r"images/feishu.png"
+    image_path = r"images/image copy 9.png"
+    # image_path = r"images/feishu.png"
     
     try:
         result = processor.process_long_image(image_path)

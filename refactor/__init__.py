@@ -1,0 +1,1 @@
+# Refactor module for long image OCR processing

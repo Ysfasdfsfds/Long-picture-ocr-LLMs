@@ -1,1 +1,2 @@
-运行long_image_ocr_opencv.py
+运行controller.pybu
+初步完成重构，主函数是controller.py 子函数都在refactor中
