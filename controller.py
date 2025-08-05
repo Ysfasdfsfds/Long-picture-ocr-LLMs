@@ -6,18 +6,12 @@
 """
 
 import os
-import json
-import cv2
-import numpy as np
+
 from pathlib import Path
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict
 from rapidocr import RapidOCR
-import math
 import shutil
-from LLM_run import process_with_llm
-import re
-from sklearn.cluster import DBSCAN
-from process_avatar import process_avatar,process_avatar_v2
+from refactor.LLM_run import process_with_llm
 from refactor.slice_image_step import perform_image_slicing
 from refactor.x_croped_calculator import calculate_x_croped
 from refactor.slice_processor import process_single_slice, collect_results_to_original_coords
@@ -357,8 +351,8 @@ def main():
     processor = LongImageOCR(config_path="./default_rapidocr.yaml")
     
     # 处理长图
-    # image_path = r"images/image copy 9.png"
-    image_path = r"images/feishu.png"
+    image_path = r"images/image copy 9.png"
+    # image_path = r"images/feishu.png"
     
     try:
         result = processor.process_long_image(image_path)

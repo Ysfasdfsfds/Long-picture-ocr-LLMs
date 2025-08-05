@@ -5,7 +5,7 @@
 
 import cv2
 from typing import Dict, List, Optional, Tuple
-from process_avatar import process_avatar_v2
+from .process_avatar import process_avatar_v2
 
 
 def process_single_slice(slice_info: Dict, engine, text_score_threshold: float, 

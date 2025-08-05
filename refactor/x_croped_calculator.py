@@ -4,7 +4,7 @@ x_croped 值计算模块
 """
 
 from typing import List, Dict, Tuple, Optional
-from process_avatar import preprocess_and_crop_image, slice_x_croped_values
+from .process_avatar import preprocess_and_crop_image, slice_x_croped_values
 
 
 def determine_slices_to_process(slices_info: List[Dict]) -> List[Dict]:
