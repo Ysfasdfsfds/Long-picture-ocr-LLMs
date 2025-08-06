@@ -125,7 +125,7 @@ def main():
     processor = LongImageOCR(config_path="./default_rapidocr.yaml")
     
     # 处理长图
-    image_path = r"images/feishu.png"
+    image_path = r"images/image copy 8.png"
     
     try:
         result = processor.process_long_image(image_path)
