@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "export_time": "2025-08-06T08:38:30.023321",
+    "total_messages": 13,
+    "description": "结构化聊天消息 - 按昵称、内容、时间组织"
+  },
+  "chat_messages": [
+    {
+      "type": "time",
+      "time": "14:55"
+    },
+    {
+      "type": "chat",
+      "昵称": "7",
+      "内容": "(5)"
+    },
+    {
+      "type": "chat",
+      "昵称": "姜凯",
+      "内容": "天津的烧麦不好吃"
+    },
+    {
+      "type": "time",
+      "time": "71411:53"
+    },
+    {
+      "type": "my_chat",
+      "昵称": "我",
+      "内容": "点呼和浩特的外卖凯哥"
+    },
+    {
+      "type": "chat",
+      "昵称": "姜凯",
+      "内容": "哈哈哈哈"
+    },
+    {
+      "type": "chat",
+      "昵称": "姜凯",
+      "内容": "烧麦到这都得跟阿标样骚了"
+    },
+    {
+      "type": "time",
+      "time": "71413:38"
+    },
+    {
+      "type": "chat",
+      "昵称": "吴标",
+      "内容": "我看校友群有那种速冻的"
+    },
+    {
+      "type": "chat",
+      "昵称": "吴标",
+      "内容": "蒸下味道说也很好"
+    },
+    {
+      "type": "chat",
+      "昵称": "姜凯",
+      "内容": "蒸完是跟你样骚么?"
+    },
+    {
+      "type": "chat",
+      "昵称": "姜凯",
+      "内容": "没有你骚的烧麦不好吃"
+    },
+    {
+      "type": "chat",
+      "昵称": "吴标",
+      "内容": "+"
+    }
+  ],
+  "statistics": {
+    "nickname_messages": 9,
+    "time_messages": 3,
+    "my_messages": 1,
+    "group_name_messages": 0,
+    "retract_messages": 0,
+    "unknown_messages": 0
+  }
+}
