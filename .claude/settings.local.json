@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git --version)",
+      "Bash(dir:*)"
+    ]
+  },
+  "outputStyle": "Explanatory"
+}
