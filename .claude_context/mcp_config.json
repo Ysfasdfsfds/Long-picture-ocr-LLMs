@@ -1,0 +1,37 @@
+{
+  "mcpServers": {
+    "code-context": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic/code-context-mcp@latest"
+      ],
+      "env": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
+        "PROJECT_ROOT": "/home/ys/桌面/Long-picture-ocr-LLMs-main_a"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem@latest"
+      ],
+      "env": {
+        "ALLOWED_PATHS": [
+          "/home/ys/桌面/Long-picture-ocr-LLMs-main_a"
+        ]
+      }
+    },
+    "git": {
+      "command": "npx", 
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-git@latest"
+      ],
+      "env": {
+        "REPO_PATH": "/home/ys/桌面/Long-picture-ocr-LLMs-main_a"
+      }
+    }
+  }
+}

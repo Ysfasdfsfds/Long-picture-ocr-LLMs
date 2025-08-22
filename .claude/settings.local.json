@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__deep-graph-mcp__folder-tree-structure",
+      "mcp__Deep-Graph-MCP__get-code",
+      "Bash(python:*)",
+      "Bash(/home/kylin/miniconda3/envs/long_ocr_LLm/bin/python -c \"print(''✅ Python解释器可正常使用''); import rapidocr; print(''✅ RapidOCR可正常导入'')\")",
+      "Bash(pkill:*)",
+      "Bash(source:*)",
+      "Bash(cp:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": []
+  }
+}

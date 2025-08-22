@@ -1,0 +1,826 @@
+#!/usr/bin/env python3
+"""
+OCR参数实验脚本
+测试不同的Detection参数配置对OCR性能的影响
+"""
+
+import os
+import shutil
+import time
+import json
+import yaml
+from pathlib import Path
+from datetime import datetime
+from typing import Dict, List, Any
+import logging
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+from src.main import LongImageOCR
+
+class OCRExperimentRunner:
+    """OCR参数实验运行器"""
+    
+    def __init__(self, base_config_path: str = "default_rapidocr.yaml", 
+                 experiments_dir: str = "/home/kylin/桌面/Long-picture-ocr-LLMs-main_a/experiments_results"):
+        """
+        初始化实验运行器
+        
+        Args:
+            base_config_path: 基础配置文件路径
+            experiments_dir: 实验结果保存目录
+        """
+        self.base_config_path = base_config_path
+        self.experiments_dir = Path(experiments_dir)
+        self.base_config = self._load_base_config()
+        
+        # 实验参数组合
+        self.experiment_configs = [
+            {"limit_type": "max", "limit_side_len": 1200},
+            {"limit_type": "max", "limit_side_len": 1000},
+            {"limit_type": "max", "limit_side_len": 800},
+            {"limit_type": "min", "limit_side_len": 1200},
+            {"limit_type": "min", "limit_side_len": 1000},
+            {"limit_type": "min", "limit_side_len": 800},
+            {"limit_type": "max", "limit_side_len": 600},
+            {"limit_type": "min", "limit_side_len": 600},
+            {"limit_type": "max", "limit_side_len": 400},
+            {"limit_type": "min", "limit_side_len": 400},
+            {"limit_type": "max", "limit_side_len": 200},
+            {"limit_type": "min", "limit_side_len": 200},
+        ]
+        
+        # 实验结果
+        self.experiment_results = {}
+    
+    def _load_base_config(self) -> Dict:
+        """加载基础配置文件"""
+        with open(self.base_config_path, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f)
+    
+    def _create_experiment_config(self, limit_type: str, limit_side_len: int) -> str:
+        """
+        创建实验配置文件
+        
+        Args:
+            limit_type: limit类型 (max/min)
+            limit_side_len: limit边长
+            
+        Returns:
+            配置文件路径
+        """
+        # 复制基础配置
+        config = self.base_config.copy()
+        
+        # 修改Det参数
+        config['Det']['limit_type'] = limit_type
+        config['Det']['limit_side_len'] = limit_side_len
+        
+        # 创建实验目录
+        exp_name = f"{limit_type}_{limit_side_len}"
+        exp_dir = self.experiments_dir / exp_name
+        exp_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 保存配置文件
+        config_path = exp_dir / "config.yaml"
+        with open(config_path, 'w', encoding='utf-8') as f:
+            yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+        
+        return str(config_path)
+    
+    def _run_single_experiment(self, limit_type: str, limit_side_len: int, 
+                             image_path: str) -> Dict[str, Any]:
+        """
+        运行单个实验
+        
+        Args:
+            limit_type: limit类型
+            limit_side_len: limit边长
+            image_path: 图像路径
+            
+        Returns:
+            实验结果
+        """
+        exp_name = f"{limit_type}_{limit_side_len}"
+        exp_dir = self.experiments_dir / exp_name
+        
+        logger.info(f"🔍 开始实验: {exp_name}")
+        logger.info(f"  参数: limit_type={limit_type}, limit_side_len={limit_side_len}")
+        
+        # 创建配置文件
+        config_path = self._create_experiment_config(limit_type, limit_side_len)
+        
+        # 切换到实验目录
+        original_cwd = os.getcwd()
+        os.chdir(exp_dir)
+        
+        try:
+            # 清理之前的输出
+            if os.path.exists("output_images"):
+                shutil.rmtree("output_images")
+            if os.path.exists("output_json"):
+                shutil.rmtree("output_json")
+            
+            # 记录开始时间
+            start_time = time.time()
+            
+            # 初始化OCR处理器
+            processor = LongImageOCR(config_path=config_path)
+            
+            # 处理图像
+            result = processor.process_long_image(image_path)
+            
+            # 记录结束时间
+            end_time = time.time()
+            total_time = end_time - start_time
+            
+            # 收集实验结果
+            experiment_result = {
+                "experiment_name": exp_name,
+                "parameters": {
+                    "limit_type": limit_type,
+                    "limit_side_len": limit_side_len
+                },
+                "timestamp": datetime.now().isoformat(),
+                "total_experiment_time": round(total_time, 3),
+                "processing_results": result,
+                "image_path": image_path,
+                "config_path": config_path
+            }
+            
+            # 读取详细时间统计（如果存在）
+            timing_file = Path("output_json") / "timing_analysis.json"
+            if timing_file.exists():
+                with open(timing_file, 'r', encoding='utf-8') as f:
+                    experiment_result["detailed_timing"] = json.load(f)
+            
+            # 读取切片详细计时（如果存在）
+            slice_timing_file = Path("output_json") / "slice_ocr_detailed_timing.json"
+            if slice_timing_file.exists():
+                with open(slice_timing_file, 'r', encoding='utf-8') as f:
+                    experiment_result["slice_detailed_timing"] = json.load(f)
+            
+            # 保存实验结果
+            result_file = exp_dir / "experiment_result.json"
+            with open(result_file, 'w', encoding='utf-8') as f:
+                json.dump(experiment_result, f, indent=2)
+            
+            # 生成简要报告
+            self._generate_experiment_report(experiment_result, exp_dir)
+            
+            logger.info(f"✅ 实验 {exp_name} 完成，耗时: {total_time:.2f}秒")
+            
+            return experiment_result
+            
+        except Exception as e:
+            logger.error(f"❌ 实验 {exp_name} 失败: {e}")
+            return {
+                "experiment_name": exp_name,
+                "error": str(e),
+                "timestamp": datetime.now().isoformat()
+            }
+        finally:
+            # 恢复原工作目录
+            os.chdir(original_cwd)
+    
+    def _generate_experiment_report(self, result: Dict, exp_dir: Path):
+        """生成单个实验的报告"""
+        report_lines = []
+        report_lines.append(f"# 实验报告: {result['experiment_name']}")
+        report_lines.append(f"时间: {result['timestamp']}")
+        report_lines.append("")
+        
+        # 参数信息
+        report_lines.append("## 实验参数")
+        for key, value in result['parameters'].items():
+            report_lines.append(f"- {key}: {value}")
+        report_lines.append("")
+        
+        # 处理结果
+        if 'processing_results' in result:
+            pr = result['processing_results']
+            report_lines.append("## 处理结果")
+            report_lines.append(f"- 总OCR项: {pr.get('total_ocr_items', 'N/A')}")
+            report_lines.append(f"- 总头像数: {pr.get('total_avatar_items', 'N/A')}")
+            report_lines.append(f"- 总消息数: {pr.get('total_chat_messages', 'N/A')}")
+            report_lines.append(f"- 总执行时间: {pr.get('total_execution_time', 'N/A')}秒")
+            report_lines.append("")
+        
+        # 详细时间统计
+        if 'detailed_timing' in result:
+            dt = result['detailed_timing']
+            report_lines.append("## 时间统计")
+            if 'step_summary' in dt:
+                for step, data in dt['step_summary'].items():
+                    if isinstance(data, dict) and 'time' in data:
+                        report_lines.append(f"- {data.get('description', step)}: {data['time']}秒")
+            report_lines.append("")
+        
+        # 切片统计
+        if 'slice_detailed_timing' in result:
+            sdt = result['slice_detailed_timing']
+            if 'summary' in sdt:
+                summary = sdt['summary']
+                report_lines.append("## 切片处理统计")
+                report_lines.append(f"- 总切片数: {summary.get('total_slices', 'N/A')}")
+                
+                if 'detailed_timing_summary' in summary:
+                    dts = summary['detailed_timing_summary']
+                    report_lines.append(f"- Detection总时间: {dts.get('total_detection_time', 'N/A')}秒")
+                    report_lines.append(f"- Recognition总时间: {dts.get('total_recognition_time', 'N/A')}秒")
+                    report_lines.append(f"- 平均每片时间: {dts.get('average_total_time', 'N/A')}秒")
+                
+                if 'processing_summary' in summary:
+                    ps = summary['processing_summary']
+                    report_lines.append(f"- 总检测框数: {ps.get('total_detected_boxes', 'N/A')}")
+                    report_lines.append(f"- 总识别文本数: {ps.get('total_final_texts', 'N/A')}")
+        
+        # 保存报告
+        report_file = exp_dir / "timing_report.txt"
+        with open(report_file, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(report_lines))
+    
+    def run_all_experiments(self, image_path: str):
+        """
+        运行所有实验配置
+        
+        Args:
+            image_path: 要处理的图像路径
+        """
+        logger.info(f"🚀 开始运行OCR参数实验")
+        logger.info(f"📷 图像路径: {image_path}")
+        logger.info(f"📁 结果保存路径: {self.experiments_dir}")
+        logger.info(f"🔢 实验配置数量: {len(self.experiment_configs)}")
+        
+        # 创建实验根目录
+        self.experiments_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 运行所有实验
+        for i, config in enumerate(self.experiment_configs, 1):
+            logger.info(f"\n{'='*60}")
+            logger.info(f"🧪 实验 {i}/{len(self.experiment_configs)}")
+            
+            result = self._run_single_experiment(
+                config['limit_type'], 
+                config['limit_side_len'], 
+                image_path
+            )
+            
+            exp_name = f"{config['limit_type']}_{config['limit_side_len']}"
+            self.experiment_results[exp_name] = result
+        
+        # 生成汇总报告
+        self._generate_summary_report()
+        
+        # 生成详细对比报告
+        self._generate_detailed_comparison_report()
+        
+        # 生成Recognition详细分析报告
+        self._generate_recognition_detailed_report()
+        
+        logger.info(f"\n{'='*60}")
+        logger.info("🎉 所有实验完成！")
+        logger.info(f"📊 汇总报告保存在: {self.experiments_dir / 'summary_report.json'}")
+        logger.info(f"📊 详细对比报告保存在: {self.experiments_dir / 'detailed_comparison_report.txt'}")
+        logger.info(f"📊 Recognition详细分析保存在: {self.experiments_dir / 'recognition_detailed_report.txt'}")
+    
+    def _generate_summary_report(self):
+        """生成汇总对比报告"""
+        summary = {
+            "experiment_overview": {
+                "total_experiments": len(self.experiment_results),
+                "timestamp": datetime.now().isoformat(),
+                "experiment_configs": self.experiment_configs
+            },
+            "results": self.experiment_results,
+            "performance_comparison": self._analyze_performance()
+        }
+        
+        # 保存汇总JSON
+        summary_file = self.experiments_dir / "summary_report.json"
+        with open(summary_file, 'w', encoding='utf-8') as f:
+            json.dump(summary, f, indent=2)
+        
+        # 生成文本格式的对比报告
+        self._generate_text_comparison_report(summary)
+    
+    def _analyze_performance(self) -> Dict:
+        """分析性能对比"""
+        analysis = {
+            "fastest_experiment": None,
+            "slowest_experiment": None,
+            "detection_time_comparison": {},
+            "recognition_time_comparison": {},
+            "accuracy_comparison": {}
+        }
+        
+        valid_results = {k: v for k, v in self.experiment_results.items() 
+                        if 'error' not in v and 'processing_results' in v}
+        
+        if not valid_results:
+            return analysis
+        
+        # 找出最快和最慢的实验
+        times = {k: v.get('total_experiment_time', float('inf')) 
+                for k, v in valid_results.items()}
+        
+        if times:
+            fastest = min(times, key=times.get)
+            slowest = max(times, key=times.get)
+            
+            analysis["fastest_experiment"] = {
+                "name": fastest,
+                "time": times[fastest]
+            }
+            analysis["slowest_experiment"] = {
+                "name": slowest,
+                "time": times[slowest]
+            }
+        
+        # 比较Detection和Recognition时间
+        for exp_name, result in valid_results.items():
+            if 'slice_detailed_timing' in result and 'summary' in result['slice_detailed_timing']:
+                summary = result['slice_detailed_timing']['summary']
+                if 'detailed_timing_summary' in summary:
+                    dts = summary['detailed_timing_summary']
+                    analysis["detection_time_comparison"][exp_name] = dts.get('total_detection_time', 0)
+                    analysis["recognition_time_comparison"][exp_name] = dts.get('total_recognition_time', 0)
+                
+                if 'processing_summary' in summary:
+                    ps = summary['processing_summary']
+                    analysis["accuracy_comparison"][exp_name] = {
+                        "detected_boxes": ps.get('total_detected_boxes', 0),
+                        "final_texts": ps.get('total_final_texts', 0)
+                    }
+        
+        return analysis
+    
+    def _generate_text_comparison_report(self, summary: Dict):
+        """生成文本格式的对比报告"""
+        report_lines = []
+        report_lines.append("# OCR参数实验对比报告")
+        report_lines.append(f"生成时间: {summary['experiment_overview']['timestamp']}")
+        report_lines.append(f"实验总数: {summary['experiment_overview']['total_experiments']}")
+        report_lines.append("")
+        
+        # 性能对比
+        perf = summary['performance_comparison']
+        if perf.get('fastest_experiment') and perf.get('slowest_experiment'):
+            report_lines.append("## 性能对比")
+            report_lines.append(f"最快实验: {perf['fastest_experiment']['name']} ({perf['fastest_experiment']['time']:.2f}秒)")
+            report_lines.append(f"最慢实验: {perf['slowest_experiment']['name']} ({perf['slowest_experiment']['time']:.2f}秒)")
+            report_lines.append("")
+        
+        # Detection时间对比
+        if perf.get('detection_time_comparison'):
+            report_lines.append("## Detection时间对比")
+            det_times = perf['detection_time_comparison']
+            sorted_det = sorted(det_times.items(), key=lambda x: x[1])
+            for exp_name, time_val in sorted_det:
+                report_lines.append(f"- {exp_name}: {time_val:.3f}秒")
+            report_lines.append("")
+        
+        # Recognition时间对比
+        if perf.get('recognition_time_comparison'):
+            report_lines.append("## Recognition时间对比")
+            rec_times = perf['recognition_time_comparison']
+            sorted_rec = sorted(rec_times.items(), key=lambda x: x[1])
+            for exp_name, time_val in sorted_rec:
+                report_lines.append(f"- {exp_name}: {time_val:.3f}秒")
+            report_lines.append("")
+        
+        # 精度对比
+        if perf.get('accuracy_comparison'):
+            report_lines.append("## 识别精度对比")
+            acc_comp = perf['accuracy_comparison']
+            for exp_name, acc_data in acc_comp.items():
+                detection_count = acc_data.get('detected_boxes', 0)
+                final_count = acc_data.get('final_texts', 0)
+                efficiency = (final_count / detection_count * 100) if detection_count > 0 else 0
+                report_lines.append(f"- {exp_name}: 检测框{detection_count} → 最终文本{final_count} (效率{efficiency:.1f}%)")
+            report_lines.append("")
+        
+        # 保存文本报告
+        text_report_file = self.experiments_dir / "comparison_report.txt"
+        with open(text_report_file, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(report_lines))
+    
+    def _generate_detailed_comparison_report(self):
+        """生成详细的对比报告，包含完整时间分析"""
+        from datetime import datetime
+        
+        report_lines = []
+        report_lines.append("# OCR参数实验详细对比报告")
+        report_lines.append(f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        report_lines.append(f"实验总数: {len(self.experiment_results)}种配置")
+        report_lines.append("")
+        
+        # 收集所有实验数据
+        experiment_data = {}
+        for exp_name, result in self.experiment_results.items():
+            if 'error' not in result and 'slice_detailed_timing' in result:
+                sdt = result['slice_detailed_timing']
+                if 'summary' in sdt and 'detailed_timing_summary' in sdt['summary']:
+                    dts = sdt['summary']['detailed_timing_summary']
+                    experiment_data[exp_name] = {
+                        'detection_time': dts.get('total_detection_time', 0),
+                        'recognition_time': dts.get('total_recognition_time', 0),
+                        'total_experiment_time': result.get('total_experiment_time', 0),
+                        'processing_results': result.get('processing_results', {})
+                    }
+        
+        if not experiment_data:
+            report_lines.append("❌ 没有有效的实验数据")
+            # 保存报告
+            detailed_report_file = self.experiments_dir / "detailed_comparison_report.txt"
+            with open(detailed_report_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(report_lines))
+            return
+        
+        # 生成表格
+        report_lines.append("## 📊 完整时间对比表格")
+        report_lines.append("")
+        report_lines.append("| 配置 | Detection时间(s) | Recognition时间(s) | OCR总时间(s) | 实验总时间(s) | 其他时间(s) |")
+        report_lines.append("|------|-----------------|------------------|-------------|-------------|------------|")
+        
+        for exp_name in sorted(experiment_data.keys()):
+            data = experiment_data[exp_name]
+            det_time = data['detection_time']
+            rec_time = data['recognition_time']
+            ocr_total = det_time + rec_time
+            exp_total = data['total_experiment_time']
+            other_time = exp_total - ocr_total
+            
+            report_lines.append(f"| {exp_name:<8} | {det_time:>6.3f} | {rec_time:>8.3f} | {ocr_total:>7.3f} | {exp_total:>7.2f} | {other_time:>6.2f} |")
+        
+        report_lines.append("")
+        
+        # 性能排名
+        report_lines.append("## 🏆 性能排名")
+        report_lines.append("")
+        
+        # 按总时间排序
+        sorted_by_total = sorted(experiment_data.items(), key=lambda x: x[1]['total_experiment_time'])
+        report_lines.append("### 按总时间排序 (快→慢)")
+        for i, (exp_name, data) in enumerate(sorted_by_total, 1):
+            total_time = data['total_experiment_time']
+            if i == 1:
+                report_lines.append(f"{i}. **{exp_name}**: {total_time:.2f}秒 ⭐ 最佳")
+            elif i == len(sorted_by_total):
+                report_lines.append(f"{i}. {exp_name}: {total_time:.2f}秒 🐌 最慢")
+            else:
+                report_lines.append(f"{i}. {exp_name}: {total_time:.2f}秒")
+        report_lines.append("")
+        
+        # 按Detection时间排序
+        sorted_by_detection = sorted(experiment_data.items(), key=lambda x: x[1]['detection_time'])
+        report_lines.append("### 按Detection时间排序 (快→慢)")
+        for i, (exp_name, data) in enumerate(sorted_by_detection, 1):
+            det_time = data['detection_time']
+            if i == 1:
+                report_lines.append(f"{i}. **{exp_name}**: {det_time:.3f}秒 ⚡ 最快Detection")
+            else:
+                report_lines.append(f"{i}. {exp_name}: {det_time:.3f}秒")
+        report_lines.append("")
+        
+        # 按Recognition时间排序
+        sorted_by_recognition = sorted(experiment_data.items(), key=lambda x: x[1]['recognition_time'])
+        report_lines.append("### 按Recognition时间排序 (快→慢)")
+        for i, (exp_name, data) in enumerate(sorted_by_recognition, 1):
+            rec_time = data['recognition_time']
+            if i == 1:
+                report_lines.append(f"{i}. **{exp_name}**: {rec_time:.3f}秒 ⚡ 最快Recognition")
+            else:
+                report_lines.append(f"{i}. {exp_name}: {rec_time:.3f}秒")
+        report_lines.append("")
+        
+        # 关键发现
+        report_lines.append("## 📈 关键发现")
+        report_lines.append("")
+        
+        # 分析limit_type影响
+        min_configs = {k: v for k, v in experiment_data.items() if k.startswith('min_')}
+        max_configs = {k: v for k, v in experiment_data.items() if k.startswith('max_')}
+        
+        if min_configs and max_configs:
+            avg_min_det = sum(v['detection_time'] for v in min_configs.values()) / len(min_configs)
+            avg_max_det = sum(v['detection_time'] for v in max_configs.values()) / len(max_configs)
+            avg_min_rec = sum(v['recognition_time'] for v in min_configs.values()) / len(min_configs)
+            avg_max_rec = sum(v['recognition_time'] for v in max_configs.values()) / len(max_configs)
+            
+            report_lines.append("### 1. limit_type影响分析")
+            report_lines.append(f"- **min系列** ({avg_min_det:.1f}s Detection, {avg_min_rec:.1f}s Recognition)")
+            report_lines.append(f"- **max系列** ({avg_max_det:.1f}s Detection, {avg_max_rec:.1f}s Recognition)")
+            det_improvement = ((avg_max_det - avg_min_det) / avg_max_det) * 100
+            rec_improvement = ((avg_max_rec - avg_min_rec) / avg_max_rec) * 100
+            report_lines.append(f"- **结论**: `limit_type=min` 比 `limit_type=max` 在Detection快{det_improvement:.0f}%, Recognition快{rec_improvement:.0f}%")
+            report_lines.append("")
+        
+        # 最优配置推荐
+        best_config = sorted_by_total[0]
+        best_name = best_config[0]
+        best_data = best_config[1]
+        
+        report_lines.append("### 2. 最优配置推荐")
+        report_lines.append(f"**🥇 综合最佳**: `{best_name}`")
+        report_lines.append(f"- 总时间最短: {best_data['total_experiment_time']:.2f}秒")
+        report_lines.append(f"- Detection时间: {best_data['detection_time']:.3f}秒")
+        report_lines.append(f"- Recognition时间: {best_data['recognition_time']:.3f}秒")
+        
+        # 从processing_results中获取识别效率
+        if 'timing' in best_data['processing_results']:
+            pr = best_data['processing_results']
+            total_ocr = pr.get('total_ocr_items', 0)
+            if 'step3_summary' in pr.get('timing', {}):
+                step3 = pr['timing']['step3_summary']
+                if 'total_ocr_time' in step3:
+                    efficiency = total_ocr / step3['total_ocr_time'] if step3['total_ocr_time'] > 0 else 0
+                    report_lines.append(f"- 识别效率: {efficiency:.1f} 项/秒")
+        report_lines.append("")
+        
+        # 性能差异分析
+        worst_config = sorted_by_total[-1]
+        time_diff = worst_config[1]['total_experiment_time'] - best_data['total_experiment_time']
+        improvement_pct = (time_diff / worst_config[1]['total_experiment_time']) * 100
+        
+        report_lines.append("## 🔍 性能差异分析")
+        fastest_det = sorted_by_detection[0][1]['detection_time']
+        slowest_det = sorted_by_detection[-1][1]['detection_time']
+        fastest_rec = sorted_by_recognition[0][1]['recognition_time']
+        slowest_rec = sorted_by_recognition[-1][1]['recognition_time']
+        
+        report_lines.append(f"- 最快 vs 最慢: **{time_diff:.2f}秒差异** ({improvement_pct:.0f}%性能差异)")
+        report_lines.append(f"- Detection差异: **{slowest_det - fastest_det:.1f}秒** ({((slowest_det - fastest_det) / slowest_det * 100):.0f}%差异)")
+        report_lines.append(f"- Recognition差异: **{slowest_rec - fastest_rec:.1f}秒** ({((slowest_rec - fastest_rec) / slowest_rec * 100):.0f}%差异)")
+        report_lines.append("")
+        
+        # 使用建议
+        report_lines.append("## 💡 使用建议")
+        report_lines.append(f"1. **生产环境推荐**: `{best_name}` - 最佳平衡点")
+        if sorted_by_detection[0][0] != best_name:
+            report_lines.append(f"2. **追求极致Detection速度**: `{sorted_by_detection[0][0]}`")
+        report_lines.append(f"3. **避免使用**: `{worst_config[0]}` - 性能最差")
+        
+        limit_type_recommendation = "min" if best_name.startswith('min_') else "max"
+        report_lines.append(f"4. **limit_type选择**: 推荐使用 `{limit_type_recommendation}`，性能提升显著")
+        
+        # 保存详细报告
+        detailed_report_file = self.experiments_dir / "detailed_comparison_report.txt"
+        with open(detailed_report_file, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(report_lines))
+        
+        logger.info(f"详细对比报告已生成: {detailed_report_file}")
+    
+    def _generate_recognition_detailed_report(self):
+        """生成Recognition阶段详细对比报告"""
+        from datetime import datetime
+        
+        report_lines = []
+        report_lines.append("# Recognition性能详细分析报告")
+        report_lines.append(f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        report_lines.append(f"实验总数: {len(self.experiment_results)}种配置")
+        report_lines.append("")
+        
+        # 收集所有实验的Recognition详细数据
+        recognition_data = {}
+        slice_count = 0
+        
+        for exp_name, result in self.experiment_results.items():
+            if 'error' not in result and 'slice_detailed_timing' in result:
+                sdt = result['slice_detailed_timing']
+                if 'slice_details' in sdt:
+                    recognition_data[exp_name] = {}
+                    slice_details = sdt['slice_details']
+                    slice_count = max(slice_count, len(slice_details))
+                    
+                    for slice_idx_str, slice_data in slice_details.items():
+                        slice_idx = int(slice_idx_str)
+                        recognition_data[exp_name][slice_idx] = {
+                            'input_boxes': slice_data.get('detected_boxes_count', 0),
+                            'recognition_time': slice_data.get('recognition_time', 0),
+                            'recognition_detailed': slice_data.get('recognition_detailed', {}),
+                            'start_y': slice_data.get('start_y', slice_idx * 1000),
+                            'end_y': slice_data.get('end_y', (slice_idx + 1) * 1000)
+                        }
+        
+        if not recognition_data:
+            report_lines.append("❌ 没有找到Recognition详细数据")
+            recognition_report_file = self.experiments_dir / "recognition_detailed_report.txt"
+            with open(recognition_report_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(report_lines))
+            return
+        
+        # 生成每个切片的详细对比
+        report_lines.append("## 📊 切片级Recognition性能对比")
+        report_lines.append("")
+        
+        configs = sorted(recognition_data.keys())
+        
+        # 为前10个切片生成详细对比（避免报告过长）
+        for slice_idx in range(min(10, slice_count)):
+            slice_data_exists = any(slice_idx in recognition_data[config] for config in configs)
+            if not slice_data_exists:
+                continue
+                
+            # 获取切片的y坐标范围
+            y_start = None
+            y_end = None
+            for config in configs:
+                if slice_idx in recognition_data[config]:
+                    y_start = recognition_data[config][slice_idx]['start_y']
+                    y_end = recognition_data[config][slice_idx]['end_y']
+                    break
+            
+            report_lines.append(f"### 切片{slice_idx} (y: {y_start}-{y_end}) Recognition详细对比")
+            report_lines.append("")
+            
+            # 基础信息表格
+            report_lines.append("#### 基础信息")
+            report_lines.append("| 配置 | 文本框数 | Recognition总时间(s) |")
+            report_lines.append("|------|---------|---------------------|")
+            
+            for config in configs:
+                if slice_idx in recognition_data[config]:
+                    data = recognition_data[config][slice_idx]
+                    boxes_count = data['input_boxes']
+                    total_time = data['recognition_time']
+                    report_lines.append(f"| {config:<8} | {boxes_count:>8} | {total_time:>11.3f} |")
+            
+            report_lines.append("")
+            
+            # 详细时间分解表格
+            report_lines.append("#### Recognition阶段分解")
+            report_lines.append("| 配置 | 预处理 | | | Forward | 后处理 | |")
+            report_lines.append("|------|--------|-------|-------|---------|--------|-------|")
+            report_lines.append("| | resize | batch | 小计 | 推理 | CTC解码 | 小计 |")
+            
+            for config in configs:
+                if slice_idx in recognition_data[config]:
+                    data = recognition_data[config][slice_idx]
+                    detailed = data.get('recognition_detailed', {})
+                    
+                    # 提取各阶段时间
+                    prep = detailed.get('preprocessing', {})
+                    resize_time = prep.get('resize_norm_time', 0)
+                    batch_time = prep.get('batch_prepare_time', 0)
+                    prep_total = prep.get('total', resize_time + batch_time)
+                    
+                    forward = detailed.get('forward', {})
+                    inference_time = forward.get('inference_time', 0)
+                    
+                    post = detailed.get('postprocessing', {})
+                    ctc_time = post.get('ctc_decode_time', 0)
+                    post_total = post.get('total', ctc_time)
+                    
+                    report_lines.append(f"| {config:<8} | {resize_time:>6.3f} | {batch_time:>5.3f} | {prep_total:>5.3f} | {inference_time:>7.3f} | {ctc_time:>7.3f} | {post_total:>5.3f} |")
+            
+            report_lines.append("")
+            
+            # 性能差异分析
+            if len(configs) >= 2:
+                report_lines.append("#### 关键发现")
+                
+                # 找出最快和最慢的配置
+                valid_configs = [(config, recognition_data[config][slice_idx]['recognition_time']) 
+                               for config in configs if slice_idx in recognition_data[config]]
+                
+                if valid_configs:
+                    fastest = min(valid_configs, key=lambda x: x[1])
+                    slowest = max(valid_configs, key=lambda x: x[1])
+                    
+                    time_diff = slowest[1] - fastest[1]
+                    improvement_pct = (time_diff / slowest[1]) * 100 if slowest[1] > 0 else 0
+                    
+                    report_lines.append(f"- **最快配置**: {fastest[0]} ({fastest[1]:.3f}s)")
+                    report_lines.append(f"- **最慢配置**: {slowest[0]} ({slowest[1]:.3f}s)")
+                    report_lines.append(f"- **性能差异**: {time_diff:.3f}s ({improvement_pct:.0f}%差异)")
+                    
+                    # 分析主要瓶颈
+                    fastest_detailed = recognition_data[fastest[0]][slice_idx].get('recognition_detailed', {})
+                    slowest_detailed = recognition_data[slowest[0]][slice_idx].get('recognition_detailed', {})
+                    
+                    fastest_inference = fastest_detailed.get('forward', {}).get('inference_time', 0)
+                    slowest_inference = slowest_detailed.get('forward', {}).get('inference_time', 0)
+                    
+                    if fastest_inference > 0 and slowest_inference > 0:
+                        inference_diff_pct = ((slowest_inference - fastest_inference) / fastest_inference) * 100
+                        report_lines.append(f"- **推理阶段差异**: {inference_diff_pct:.0f}% (主要性能瓶颈)")
+            
+            report_lines.append("")
+            report_lines.append("---")
+            report_lines.append("")
+        
+        # 整体统计分析
+        report_lines.append("## 📈 整体Recognition性能统计")
+        report_lines.append("")
+        
+        # 计算各配置的平均性能
+        avg_performance = {}
+        for config in configs:
+            total_recognition_time = 0
+            total_boxes = 0
+            total_slices = 0
+            
+            for slice_idx, data in recognition_data[config].items():
+                total_recognition_time += data['recognition_time']
+                total_boxes += data['input_boxes']
+                total_slices += 1
+            
+            if total_slices > 0:
+                avg_performance[config] = {
+                    'avg_recognition_time': total_recognition_time / total_slices,
+                    'avg_boxes_per_slice': total_boxes / total_slices,
+                    'avg_time_per_box': total_recognition_time / total_boxes if total_boxes > 0 else 0
+                }
+        
+        report_lines.append("### 平均性能对比")
+        report_lines.append("| 配置 | 平均Recognition时间(s) | 平均文本框数 | 平均每框时间(ms) |")
+        report_lines.append("|------|----------------------|-------------|----------------|")
+        
+        for config in sorted(avg_performance.keys()):
+            perf = avg_performance[config]
+            avg_time = perf['avg_recognition_time']
+            avg_boxes = perf['avg_boxes_per_slice']
+            time_per_box = perf['avg_time_per_box'] * 1000  # 转换为毫秒
+            
+            report_lines.append(f"| {config:<8} | {avg_time:>14.3f} | {avg_boxes:>11.1f} | {time_per_box:>14.1f} |")
+        
+        report_lines.append("")
+        
+        # 性能排名
+        report_lines.append("### 🏆 Recognition性能排名")
+        sorted_by_avg_time = sorted(avg_performance.items(), key=lambda x: x[1]['avg_recognition_time'])
+        
+        for i, (config, perf) in enumerate(sorted_by_avg_time, 1):
+            avg_time = perf['avg_recognition_time']
+            if i == 1:
+                report_lines.append(f"{i}. **{config}**: {avg_time:.3f}s ⭐ 最快Recognition")
+            elif i == len(sorted_by_avg_time):
+                report_lines.append(f"{i}. {config}: {avg_time:.3f}s 🐌 最慢Recognition")
+            else:
+                report_lines.append(f"{i}. {config}: {avg_time:.3f}s")
+        
+        report_lines.append("")
+        
+        # 关键洞察
+        if len(sorted_by_avg_time) >= 2:
+            fastest_config = sorted_by_avg_time[0]
+            slowest_config = sorted_by_avg_time[-1]
+            
+            performance_gap = ((slowest_config[1]['avg_recognition_time'] - 
+                              fastest_config[1]['avg_recognition_time']) / 
+                             slowest_config[1]['avg_recognition_time']) * 100
+            
+            report_lines.append("## 💡 关键洞察")
+            report_lines.append(f"1. **最优Recognition配置**: `{fastest_config[0]}` - 平均每切片 {fastest_config[1]['avg_recognition_time']:.3f}s")
+            report_lines.append(f"2. **性能差距**: 最快与最慢配置相差 {performance_gap:.0f}%")
+            report_lines.append(f"3. **单框平均处理时间**: {fastest_config[1]['avg_time_per_box']*1000:.1f}ms (最快) vs {slowest_config[1]['avg_time_per_box']*1000:.1f}ms (最慢)")
+            
+            # 判断是否与之前的整体实验结果一致
+            report_lines.append(f"4. **与整体实验结果对比**: Recognition最快配置为 `{fastest_config[0]}`")
+        
+        # 保存Recognition详细报告
+        recognition_report_file = self.experiments_dir / "recognition_detailed_report.txt"
+        with open(recognition_report_file, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(report_lines))
+        
+        logger.info(f"Recognition详细分析报告已生成: {recognition_report_file}")
+
+
+def main():
+    """主函数"""
+    # 配置参数
+    image_path = "/home/kylin/桌面/Long-picture-ocr-LLMs-main_a/images/image copy 18.png"  # 使用用户提供的图片
+    
+    # 检查图像文件是否存在
+    if not os.path.exists(image_path):
+        print(f"❌ 图像文件不存在: {image_path}")
+        print("请确保图像文件路径正确")
+        return
+    
+    # 创建实验运行器
+    runner = OCRExperimentRunner()
+    
+    # 运行所有实验
+    try:
+        runner.run_all_experiments(image_path)
+        print("\n🎉 实验全部完成！")
+        print(f"📁 结果保存在: {runner.experiments_dir}")
+        print("📊 查看汇总报告: summary_report.json")
+        print("📈 查看对比报告: comparison_report.txt")
+        
+    except KeyboardInterrupt:
+        print("\n🛑 实验被用户中断")
+    except Exception as e:
+        print(f"\n❌ 实验运行出错: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,62 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug: Controller (Main)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/controller_refactored.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}",
+            "python": "/home/kylin/miniconda3/envs/long_ocr_LLm/bin/python",
+            "args": [],
+            "stopOnEntry": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Debug: Current File", 
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}",
+            "python": "/home/kylin/miniconda3/envs/long_ocr_LLm/bin/python",
+            "args": [],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Debug: OCR Engine Only",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}",
+            "python": "/home/kylin/miniconda3/envs/long_ocr_LLm/bin/python",
+            "args": [],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Debug: RapidOCR Test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_rapidocr_debug.py",
+            "console": "integratedTerminal", 
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}",
+            "python": "/home/kylin/miniconda3/envs/long_ocr_LLm/bin/python",
+            "args": [],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        }
+    ]
+}

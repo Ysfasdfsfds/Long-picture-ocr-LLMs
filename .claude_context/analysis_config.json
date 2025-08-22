@@ -1,0 +1,70 @@
+{
+  "project_analysis": {
+    "name": "OCR长图智能处理系统",
+    "type": "python_ocr_project",
+    "main_entry_points": [
+      "controller_refactored.py",
+      "src/main.py"
+    ],
+    "core_modules": {
+      "image_processing": [
+        "src/core/image_slicer.py",
+        "src/core/ocr_engine.py"
+      ],
+      "chat_analysis": [
+        "src/core/chat_analyzer.py",
+        "src/processors/content_marker.py"
+      ],
+      "data_models": [
+        "src/models/ocr_result.py",
+        "src/models/chat_message.py",
+        "src/models/slice_info.py"
+      ],
+      "utilities": [
+        "src/utils/config.py",
+        "src/utils/image_utils.py",
+        "src/utils/type_converter.py"
+      ]
+    },
+    "key_dependencies": {
+      "ocr_engine": "rapidocr-onnxruntime",
+      "image_processing": "opencv-python",
+      "numerical_computing": "numpy",
+      "image_handling": "pillow",
+      "http_requests": "requests"
+    },
+    "configuration_files": [
+      "default_rapidocr.yaml"
+    ],
+    "output_directories": [
+      "output_images/",
+      "output_json/",
+      "logs/"
+    ]
+  },
+  "code_patterns": {
+    "architecture_pattern": "layered_architecture",
+    "data_flow": [
+      "input_image",
+      "image_slicing",
+      "ocr_processing", 
+      "content_marking",
+      "deduplication",
+      "json_export",
+      "llm_integration"
+    ],
+    "common_patterns": [
+      "type_annotations",
+      "config_driven",
+      "modular_design",
+      "debugging_support"
+    ]
+  },
+  "analysis_focus": [
+    "image_processing_pipeline",
+    "ocr_accuracy_optimization",
+    "chat_message_structuring",
+    "llm_integration_patterns",
+    "configuration_management"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+    "cmake.sourceDirectory": "/home/kylin/桌面/Long-picture-ocr-LLMs-main_a/cpp_project",
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "python-envs.pythonProjects": [],
+    "python.pythonPath": "/home/kylin/miniconda3/envs/long_ocr_LLm/bin/python",
+    "python.defaultInterpreterPath": "/home/kylin/miniconda3/envs/long_ocr_LLm/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}",
+        "${workspaceFolder}/src"
+    ],
+    "python.analysis.autoSearchPaths": true
+}
